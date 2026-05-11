@@ -1,0 +1,68 @@
+@page "/books"
+@inject IBookPublicApiClient BookApi
+@inject ReaderSessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>Available books</PageTitle>
+
+<h2>Available books</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_books.Count == 0)
+{
+    <p>No books are currently available.</p>
+}
+else
+{
+    <div class="row">
+        @foreach (var book in _books)
+        {
+            <div class="col-md-6 col-lg-4 mb-3">
+                <div class="card h-100">
+                    <div class="card-body">
+                        <h5 class="card-title">@book.Title</h5>
+                        <h6 class="card-subtitle mb-2 text-muted">@book.Author</h6>
+                        <p class="card-text mb-1"><small>@book.Publisher · @book.PublicationYear</small></p>
+                        <p class="card-text">
+                            @if (book.AverageRating.HasValue)
+                            {
+                                <span>@book.AverageRating.Value.ToString("F1") / 5 (@book.ReviewCount reviews)</span>
+                            }
+                            else
+                            {
+                                <span class="text-muted">No reviews yet</span>
+                            }
+                        </p>
+                        <a class="btn btn-sm btn-outline-primary" href="@($"books/{book.InventoryNumber}/review")">Write a review</a>
+                    </div>
+                </div>
+            </div>
+        }
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<BookDTO> _books = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsLoggedIn)
+        {
+            Nav.NavigateTo("", replace: true);
+            return;
+        }
+        try
+        {
+            var books = await BookApi.GetAvailableAsync();
+            _books = books.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

@@ -1,0 +1,117 @@
+@page "/reviews"
+@inject IBookApiClient BookApi
+@inject IReviewApiClient ReviewApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Reviews</PageTitle>
+
+<h2>Reviews (moderation)</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else if (_reviews.Count == 0)
+{
+    <p>No reviews to moderate.</p>
+}
+else
+{
+    <table class="table table-striped">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Book</th>
+                <th>Reader</th>
+                <th>Score</th>
+                <th>Text</th>
+                <th>Created</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+            @foreach (var review in _reviews)
+            {
+                <tr>
+                    <td>@review.Id</td>
+                    <td>@review.BookTitle (#@review.InventoryNumber)</td>
+                    <td>@review.ReaderName (#@review.ReaderNumber)</td>
+                    <td>@review.Score</td>
+                    <td>@review.Text</td>
+                    <td>@review.CreatedAt.ToString("yyyy-MM-dd")</td>
+                    <td><button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(review)">Delete</button></td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<ReviewDTO> _reviews = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var books = await BookApi.GetAllAsync();
+            var all = new List<ReviewDTO>();
+            foreach (var book in books)
+            {
+                var reviews = await ReviewApi.GetByBookAsync(book.InventoryNumber);
+                all.AddRange(reviews);
+            }
+            _reviews = all.OrderByDescending(r => r.CreatedAt).ToList();
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+                return;
+            }
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(ReviewDTO review)
+    {
+        var response = await ReviewApi.DeleteAsync(review.Id);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadAsync();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("login", replace: true);
+        }
+        else
+        {
+            _error = $"Delete failed: {response.StatusCode}";
+        }
+    }
+}

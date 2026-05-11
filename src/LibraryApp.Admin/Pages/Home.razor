@@ -1,0 +1,44 @@
+@page "/"
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>LibraryApp Admin</PageTitle>
+
+<h1>Librarian Dashboard</h1>
+
+@if (_loading)
+{
+    <p>Checking session...</p>
+}
+else
+{
+    <p class="lead">Manage books, readers, loans and reviews.</p>
+    <div class="row mt-4">
+        <div class="col-md-3 mb-3">
+            <a class="btn btn-primary btn-lg w-100" href="books">Books</a>
+        </div>
+        <div class="col-md-3 mb-3">
+            <a class="btn btn-primary btn-lg w-100" href="readers">Readers</a>
+        </div>
+        <div class="col-md-3 mb-3">
+            <a class="btn btn-primary btn-lg w-100" href="loans">Loans</a>
+        </div>
+        <div class="col-md-3 mb-3">
+            <a class="btn btn-primary btn-lg w-100" href="reviews">Reviews</a>
+        </div>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        _loading = false;
+    }
+}

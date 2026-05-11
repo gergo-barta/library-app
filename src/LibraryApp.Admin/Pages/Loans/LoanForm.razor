@@ -1,0 +1,117 @@
+@page "/loans/new"
+@inject IBookApiClient BookApi
+@inject IReaderApiClient ReaderApi
+@inject ILoanApiClient LoanApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>New loan</PageTitle>
+
+<h2>New loan</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Reader</label>
+            <InputSelect class="form-select" @bind-Value="_model.ReaderNumber">
+                <option value="0">-- choose a reader --</option>
+                @foreach (var reader in _readers)
+                {
+                    <option value="@reader.ReaderNumber">@reader.Name (#@reader.ReaderNumber)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Book</label>
+            <InputSelect class="form-select" @bind-Value="_model.InventoryNumber">
+                <option value="0">-- choose a book --</option>
+                @foreach (var book in _availableBooks)
+                {
+                    <option value="@book.InventoryNumber">@book.Title — @book.Author (#@book.InventoryNumber)</option>
+                }
+            </InputSelect>
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Loan date</label>
+            <InputDate class="form-control" @bind-Value="_model.LoanDate" />
+            <ValidationMessage For="@(() => _model.LoanDate)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Due date</label>
+            <InputDate class="form-control" @bind-Value="_model.DueDate" />
+            <ValidationMessage For="@(() => _model.DueDate)" />
+        </div>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        <button class="btn btn-primary me-2" type="submit" disabled="@(_busy || _model.ReaderNumber <= 0 || _model.InventoryNumber <= 0)">Save</button>
+        <a class="btn btn-secondary" href="loans">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    private bool _loading = true;
+    private bool _busy;
+    private string? _error;
+    private List<ReaderDTO> _readers = new();
+    private List<BookDTO> _availableBooks = new();
+    private CreateLoanRequest _model = new()
+    {
+        LoanDate = DateTime.Today,
+        DueDate = DateTime.Today.AddDays(14)
+    };
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        try
+        {
+            var readers = await ReaderApi.GetAllAsync();
+            _readers = readers.ToList();
+            var books = await BookApi.GetAvailableAsync();
+            _availableBooks = books.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            var response = await LoanApi.CreateAsync(_model);
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("loans");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+            }
+            else
+            {
+                _error = $"Save failed: {response.StatusCode} - {await response.Content.ReadAsStringAsync()}";
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

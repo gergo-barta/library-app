@@ -1,0 +1,140 @@
+@page "/books/{InventoryNumber:int}/review"
+@inject IBookPublicApiClient BookApi
+@inject IReviewPublicApiClient ReviewApi
+@inject ReaderSessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>Write a review</PageTitle>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_book is null)
+{
+    <div class="alert alert-warning">Book not found.</div>
+}
+else
+{
+    <h2>Review: @_book.Title</h2>
+    <p class="text-muted">by @_book.Author</p>
+
+    <h4 class="mt-4">Existing reviews</h4>
+    @if (_existingReviews.Count == 0)
+    {
+        <p>No reviews yet — be the first!</p>
+    }
+    else
+    {
+        <ul class="list-group mb-4">
+            @foreach (var review in _existingReviews)
+            {
+                <li class="list-group-item">
+                    <div class="d-flex justify-content-between">
+                        <strong>@review.ReaderName</strong>
+                        <span>@review.Score / 5 — @review.CreatedAt.ToString("yyyy-MM-dd")</span>
+                    </div>
+                    <div>@review.Text</div>
+                </li>
+            }
+        </ul>
+    }
+
+    <h4>Write your review</h4>
+    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Score</label>
+            <InputSelect class="form-select" @bind-Value="_model.Score">
+                <option value="0">-- choose --</option>
+                <option value="1">1</option>
+                <option value="2">2</option>
+                <option value="3">3</option>
+                <option value="4">4</option>
+                <option value="5">5</option>
+            </InputSelect>
+            <ValidationMessage For="@(() => _model.Score)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Review text</label>
+            <InputTextArea class="form-control" rows="4" @bind-Value="_model.Text" />
+            <ValidationMessage For="@(() => _model.Text)" />
+        </div>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        @if (_submitted)
+        {
+            <div class="alert alert-success">Review submitted. Thank you!</div>
+        }
+        <button class="btn btn-primary me-2" type="submit" disabled="@_busy">Submit</button>
+        <a class="btn btn-secondary" href="books">Back</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int InventoryNumber { get; set; }
+
+    private bool _loading = true;
+    private bool _busy;
+    private bool _submitted;
+    private string? _error;
+    private BookDTO? _book;
+    private List<ReviewDTO> _existingReviews = new();
+    private CreateReviewRequest _model = new();
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!Session.IsLoggedIn)
+        {
+            Nav.NavigateTo("", replace: true);
+            return;
+        }
+        _model.InventoryNumber = InventoryNumber;
+        _model.ReaderNumber = Session.CurrentReader!.ReaderNumber;
+        try
+        {
+            _book = await BookApi.GetByIdAsync(InventoryNumber);
+            if (_book is not null)
+            {
+                var reviews = await ReviewApi.GetByBookAsync(InventoryNumber);
+                _existingReviews = reviews.ToList();
+            }
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _busy = true;
+        _error = null;
+        _submitted = false;
+        try
+        {
+            var response = await ReviewApi.CreateAsync(_model);
+            if (response.IsSuccessStatusCode)
+            {
+                _submitted = true;
+                _model = new CreateReviewRequest
+                {
+                    InventoryNumber = InventoryNumber,
+                    ReaderNumber = Session.CurrentReader!.ReaderNumber
+                };
+                var reviews = await ReviewApi.GetByBookAsync(InventoryNumber);
+                _existingReviews = reviews.ToList();
+            }
+            else
+            {
+                _error = $"Submit failed: {response.StatusCode}";
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

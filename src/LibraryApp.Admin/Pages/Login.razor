@@ -1,0 +1,61 @@
+@page "/login"
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Sign in</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-4">
+        <div class="card mt-5">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Librarian Sign in</h3>
+                <EditForm Model="_model" OnValidSubmit="HandleLogin">
+                    <DataAnnotationsValidator />
+                    <div class="mb-3">
+                        <label class="form-label">Password</label>
+                        <InputText @bind-Value="_model.Password" type="password" class="form-control" />
+                        <ValidationMessage For="@(() => _model.Password)" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert-danger">@_error</div>
+                    }
+                    <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
+                        @(_busy ? "Signing in..." : "Sign in")
+                    </button>
+                </EditForm>
+                <p class="text-muted mt-3 small">Default password: <code>admin123</code></p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private readonly LoginRequest _model = new();
+    private string? _error;
+    private bool _busy;
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("", replace: true);
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        _busy = true;
+        _error = null;
+        var ok = await Auth.LoginAsync(_model.Password);
+        if (ok)
+        {
+            Nav.NavigateTo("", replace: true);
+        }
+        else
+        {
+            _error = "Invalid password.";
+        }
+        _busy = false;
+    }
+}

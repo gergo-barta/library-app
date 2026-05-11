@@ -1,0 +1,150 @@
+@page "/loans"
+@inject ILoanApiClient LoanApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Loans</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Loans</h2>
+    <a class="btn btn-primary" href="loans/new">+ New loan</a>
+</div>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Reader</th>
+                    <th>Book</th>
+                    <th>Loan date</th>
+                    <th>Due date</th>
+                    <th>Returned</th>
+                    <th>Status</th>
+                    <th>Late fee</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var loan in _loans)
+                {
+                    <tr>
+                        <td>@loan.Id</td>
+                        <td>@loan.ReaderName (#@loan.ReaderNumber)</td>
+                        <td>@loan.BookTitle (#@loan.InventoryNumber)</td>
+                        <td>@loan.LoanDate.ToString("yyyy-MM-dd")</td>
+                        <td>@loan.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(loan.ReturnDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td>
+                            @{
+                                var cls = loan.Status switch
+                                {
+                                    "Active" => "bg-primary",
+                                    "Overdue" => "bg-danger",
+                                    "Returned" => "bg-success",
+                                    _ => "bg-warning text-dark"
+                                };
+                            }
+                            <span class="badge @cls">@loan.Status</span>
+                        </td>
+                        <td>@loan.LateFee.ToString("0.##")</td>
+                        <td>
+                            @if (loan.ReturnDate is null)
+                            {
+                                <button class="btn btn-sm btn-success me-1" @onclick="() => Return(loan)">Return</button>
+                            }
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(loan)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<LoanDTO> _loans = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var loans = await LoanApi.GetAllAsync();
+            _loans = loans.ToList();
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+                return;
+            }
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Return(LoanDTO loan)
+    {
+        var response = await LoanApi.ReturnAsync(loan.Id);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadAsync();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("login", replace: true);
+        }
+        else
+        {
+            _error = $"Return failed: {response.StatusCode}";
+        }
+    }
+
+    private async Task Delete(LoanDTO loan)
+    {
+        var response = await LoanApi.DeleteAsync(loan.Id);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadAsync();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("login", replace: true);
+        }
+        else
+        {
+            _error = $"Delete failed: {response.StatusCode}";
+        }
+    }
+}

@@ -1,0 +1,75 @@
+@page "/"
+@inject IReaderPublicApiClient ReaderApi
+@inject ReaderSessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>Reader sign in</PageTitle>
+
+<div class="row justify-content-center">
+    <div class="col-md-6 col-lg-5">
+        <div class="card mt-5">
+            <div class="card-body">
+                <h3 class="card-title text-center mb-4">Sign in</h3>
+                <p class="text-muted small">Enter your reader number to view available books and your loans.</p>
+                <EditForm Model="this" OnValidSubmit="HandleLogin">
+                    <div class="mb-3">
+                        <label class="form-label">Reader number</label>
+                        <InputNumber class="form-control" @bind-Value="_readerNumber" />
+                    </div>
+                    @if (!string.IsNullOrEmpty(_error))
+                    {
+                        <div class="alert alert-danger">@_error</div>
+                    }
+                    <button type="submit" class="btn btn-primary w-100" disabled="@_busy">
+                        @(_busy ? "Signing in..." : "Sign in")
+                    </button>
+                </EditForm>
+                <p class="text-muted mt-3 small">Seeded reader numbers start at 1 (see the README for sample data).</p>
+            </div>
+        </div>
+    </div>
+</div>
+
+@code {
+    private int _readerNumber = 1;
+    private string? _error;
+    private bool _busy;
+
+    protected override void OnInitialized()
+    {
+        if (Session.IsLoggedIn)
+        {
+            Nav.NavigateTo("books", replace: true);
+        }
+    }
+
+    private async Task HandleLogin()
+    {
+        if (_readerNumber <= 0)
+        {
+            _error = "Reader number must be positive.";
+            return;
+        }
+        _busy = true;
+        _error = null;
+        try
+        {
+            var reader = await ReaderApi.GetByNumberAsync(_readerNumber);
+            if (reader is null)
+            {
+                _error = "Reader not found.";
+                return;
+            }
+            Session.SetReader(reader);
+            Nav.NavigateTo("books");
+        }
+        catch (Exception ex)
+        {
+            _error = $"Login failed: {ex.Message}";
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,126 @@
+@page "/readers/new"
+@page "/readers/{ReaderNumber:int}/edit"
+@inject IReaderApiClient ReaderApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>@(IsEdit ? "Edit reader" : "New reader")</PageTitle>
+
+<h2>@(IsEdit ? "Edit reader" : "New reader")</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Name</label>
+            <InputText class="form-control" @bind-Value="_model.Name" />
+            <ValidationMessage For="@(() => _model.Name)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Address</label>
+            <InputText class="form-control" @bind-Value="_model.Address" />
+            <ValidationMessage For="@(() => _model.Address)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Date of birth</label>
+            <InputDate class="form-control" @bind-Value="_model.DateOfBirth" />
+            <ValidationMessage For="@(() => _model.DateOfBirth)" />
+        </div>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        <button class="btn btn-primary me-2" type="submit" disabled="@_busy">Save</button>
+        <a class="btn btn-secondary" href="readers">Cancel</a>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? ReaderNumber { get; set; }
+
+    private bool IsEdit => ReaderNumber.HasValue;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private CreateReaderRequest _model = new() { DateOfBirth = new DateTime(2000, 1, 1) };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+
+        if (IsEdit)
+        {
+            _loading = true;
+            try
+            {
+                var reader = await ReaderApi.GetByIdAsync(ReaderNumber!.Value);
+                if (reader is null)
+                {
+                    _error = "Reader not found.";
+                    return;
+                }
+                _model = new CreateReaderRequest
+                {
+                    Name = reader.Name,
+                    Address = reader.Address,
+                    DateOfBirth = reader.DateOfBirth
+                };
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            HttpResponseMessage response;
+            if (IsEdit)
+            {
+                var update = new UpdateReaderRequest
+                {
+                    Name = _model.Name,
+                    Address = _model.Address,
+                    DateOfBirth = _model.DateOfBirth
+                };
+                response = await ReaderApi.UpdateAsync(ReaderNumber!.Value, update);
+            }
+            else
+            {
+                response = await ReaderApi.CreateAsync(_model);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("readers");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+            }
+            else
+            {
+                _error = $"Save failed: {response.StatusCode}";
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

@@ -1,0 +1,110 @@
+@page "/readers"
+@inject IReaderApiClient ReaderApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Readers</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Readers</h2>
+    <a class="btn btn-primary" href="readers/new">+ Add reader</a>
+</div>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Name</th>
+                    <th>Address</th>
+                    <th>Date of birth</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var reader in _readers)
+                {
+                    <tr>
+                        <td>@reader.ReaderNumber</td>
+                        <td>@reader.Name</td>
+                        <td>@reader.Address</td>
+                        <td>@reader.DateOfBirth.ToString("yyyy-MM-dd")</td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary me-1" href="@($"readers/{reader.ReaderNumber}/edit")">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(reader)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<ReaderDTO> _readers = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var readers = await ReaderApi.GetAllAsync();
+            _readers = readers.ToList();
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+                return;
+            }
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(ReaderDTO reader)
+    {
+        var response = await ReaderApi.DeleteAsync(reader.ReaderNumber);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadAsync();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("login", replace: true);
+        }
+        else
+        {
+            _error = $"Failed to delete reader: {response.StatusCode}";
+        }
+    }
+}

@@ -1,0 +1,70 @@
+@inject ReaderSessionState Session
+@inject NavigationManager Nav
+@implements IDisposable
+
+<div class="top-row ps-3 navbar navbar-dark">
+    <div class="container-fluid">
+        <a class="navbar-brand" href="">LibraryApp Reader</a>
+        <button title="Navigation menu" class="navbar-toggler" @onclick="ToggleNavMenu">
+            <span class="navbar-toggler-icon"></span>
+        </button>
+    </div>
+</div>
+
+<div class="@NavMenuCssClass nav-scrollable" @onclick="ToggleNavMenu">
+    <nav class="nav flex-column">
+        @if (Session.IsLoggedIn)
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="books">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> Available books
+                </NavLink>
+            </div>
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="my-loans">
+                    <span class="bi bi-list-nested-nav-menu" aria-hidden="true"></span> My loans
+                </NavLink>
+            </div>
+            <div class="nav-item px-3 mt-3">
+                <small class="text-muted">Signed in as<br /><strong>@Session.CurrentReader!.Name</strong></small>
+            </div>
+            <div class="nav-item px-3 mt-2">
+                <button class="btn btn-sm btn-warning w-100" @onclick="SignOut">Sign out</button>
+            </div>
+        }
+        else
+        {
+            <div class="nav-item px-3">
+                <NavLink class="nav-link" href="" Match="NavLinkMatch.All">
+                    <span class="bi bi-house-door-fill-nav-menu" aria-hidden="true"></span> Sign in
+                </NavLink>
+            </div>
+        }
+    </nav>
+</div>
+
+@code {
+    private bool collapseNavMenu = true;
+
+    private string? NavMenuCssClass => collapseNavMenu ? "collapse" : null;
+
+    private void ToggleNavMenu() => collapseNavMenu = !collapseNavMenu;
+
+    protected override void OnInitialized()
+    {
+        Session.OnChange += HandleChange;
+    }
+
+    private void HandleChange() => InvokeAsync(StateHasChanged);
+
+    private void SignOut()
+    {
+        Session.Clear();
+        Nav.NavigateTo("");
+    }
+
+    public void Dispose()
+    {
+        Session.OnChange -= HandleChange;
+    }
+}

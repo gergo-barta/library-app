@@ -1,0 +1,135 @@
+@page "/books/new"
+@page "/books/{Id:int}/edit"
+@inject IBookApiClient BookApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>@(IsEdit ? "Edit book" : "New book")</PageTitle>
+
+<h2>@(IsEdit ? "Edit book" : "New book")</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else
+{
+    <EditForm Model="_model" OnValidSubmit="HandleSubmit">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label class="form-label">Title</label>
+            <InputText class="form-control" @bind-Value="_model.Title" />
+            <ValidationMessage For="@(() => _model.Title)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Author</label>
+            <InputText class="form-control" @bind-Value="_model.Author" />
+            <ValidationMessage For="@(() => _model.Author)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Publisher</label>
+            <InputText class="form-control" @bind-Value="_model.Publisher" />
+            <ValidationMessage For="@(() => _model.Publisher)" />
+        </div>
+        <div class="mb-3">
+            <label class="form-label">Publication year</label>
+            <InputNumber class="form-control" @bind-Value="_model.PublicationYear" />
+            <ValidationMessage For="@(() => _model.PublicationYear)" />
+        </div>
+        @if (!string.IsNullOrEmpty(_error))
+        {
+            <div class="alert alert-danger">@_error</div>
+        }
+        <div>
+            <button class="btn btn-primary me-2" type="submit" disabled="@_busy">Save</button>
+            <a class="btn btn-secondary" href="books">Cancel</a>
+        </div>
+    </EditForm>
+}
+
+@code {
+    [Parameter] public int? Id { get; set; }
+
+    private bool IsEdit => Id.HasValue;
+    private bool _loading;
+    private bool _busy;
+    private string? _error;
+    private CreateBookRequest _model = new() { PublicationYear = DateTime.Today.Year };
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+
+        if (IsEdit)
+        {
+            _loading = true;
+            try
+            {
+                var book = await BookApi.GetByIdAsync(Id!.Value);
+                if (book is null)
+                {
+                    _error = "Book not found.";
+                    return;
+                }
+                _model = new CreateBookRequest
+                {
+                    Title = book.Title,
+                    Author = book.Author,
+                    Publisher = book.Publisher,
+                    PublicationYear = book.PublicationYear
+                };
+            }
+            finally
+            {
+                _loading = false;
+            }
+        }
+    }
+
+    private async Task HandleSubmit()
+    {
+        _busy = true;
+        _error = null;
+        try
+        {
+            HttpResponseMessage response;
+            if (IsEdit)
+            {
+                var update = new UpdateBookRequest
+                {
+                    Title = _model.Title,
+                    Author = _model.Author,
+                    Publisher = _model.Publisher,
+                    PublicationYear = _model.PublicationYear
+                };
+                response = await BookApi.UpdateAsync(Id!.Value, update);
+            }
+            else
+            {
+                response = await BookApi.CreateAsync(_model);
+            }
+
+            if (response.IsSuccessStatusCode)
+            {
+                Nav.NavigateTo("books");
+            }
+            else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+            }
+            else
+            {
+                _error = $"Save failed: {response.StatusCode}";
+            }
+        }
+        finally
+        {
+            _busy = false;
+        }
+    }
+}

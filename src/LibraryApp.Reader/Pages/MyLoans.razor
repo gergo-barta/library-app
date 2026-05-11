@@ -1,0 +1,81 @@
+@page "/my-loans"
+@inject ILoanPublicApiClient LoanApi
+@inject ReaderSessionState Session
+@inject NavigationManager Nav
+
+<PageTitle>My loans</PageTitle>
+
+<h2>My loans</h2>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_loans.Count == 0)
+{
+    <p>No loans on file.</p>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>Book</th>
+                    <th>Loan date</th>
+                    <th>Due date</th>
+                    <th>Returned</th>
+                    <th>Status</th>
+                    <th>Late fee</th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var loan in _loans)
+                {
+                    <tr>
+                        <td>@loan.BookTitle (#@loan.InventoryNumber)</td>
+                        <td>@loan.LoanDate.ToString("yyyy-MM-dd")</td>
+                        <td>@loan.DueDate.ToString("yyyy-MM-dd")</td>
+                        <td>@(loan.ReturnDate?.ToString("yyyy-MM-dd") ?? "-")</td>
+                        <td>
+                            @{
+                                var cls = loan.Status switch
+                                {
+                                    "Active" => "bg-primary",
+                                    "Overdue" => "bg-danger",
+                                    "Returned" => "bg-success",
+                                    _ => "bg-warning text-dark"
+                                };
+                            }
+                            <span class="badge @cls">@loan.Status</span>
+                        </td>
+                        <td>@loan.LateFee.ToString("0.##")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private List<LoanDTO> _loans = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!Session.IsLoggedIn)
+        {
+            Nav.NavigateTo("", replace: true);
+            return;
+        }
+        try
+        {
+            var loans = await LoanApi.GetByReaderAsync(Session.CurrentReader!.ReaderNumber);
+            _loans = loans.ToList();
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+}

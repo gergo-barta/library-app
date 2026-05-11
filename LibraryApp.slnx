@@ -1,0 +1,14 @@
+<Solution>
+  <Folder Name="/src/">
+    <Project Path="src/LibraryApp.Admin/LibraryApp.Admin.csproj" />
+    <Project Path="src/LibraryApp.API/LibraryApp.API.csproj" />
+    <Project Path="src/LibraryApp.Application/LibraryApp.Application.csproj" />
+    <Project Path="src/LibraryApp.Domain/LibraryApp.Domain.csproj" />
+    <Project Path="src/LibraryApp.Infrastructure/LibraryApp.Infrastructure.csproj" />
+    <Project Path="src/LibraryApp.Reader/LibraryApp.Reader.csproj" />
+    <Project Path="src/LibraryApp.Shared/LibraryApp.Shared.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/LibraryApp.Tests/LibraryApp.Tests.csproj" />
+  </Folder>
+</Solution>

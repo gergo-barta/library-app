@@ -1,0 +1,125 @@
+@page "/books"
+@inject IBookApiClient BookApi
+@inject AdminAuthService Auth
+@inject NavigationManager Nav
+
+<PageTitle>Books</PageTitle>
+
+<div class="d-flex justify-content-between align-items-center mb-3">
+    <h2>Books</h2>
+    <a class="btn btn-primary" href="books/new">+ Add book</a>
+</div>
+
+@if (_loading)
+{
+    <p>Loading...</p>
+}
+else if (_error is not null)
+{
+    <div class="alert alert-danger">@_error</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table table-striped">
+            <thead>
+                <tr>
+                    <th>#</th>
+                    <th>Title</th>
+                    <th>Author</th>
+                    <th>Publisher</th>
+                    <th>Year</th>
+                    <th>Rating</th>
+                    <th>Available</th>
+                    <th></th>
+                </tr>
+            </thead>
+            <tbody>
+                @foreach (var book in _books)
+                {
+                    <tr>
+                        <td>@book.InventoryNumber</td>
+                        <td><a href="@($"books/{book.InventoryNumber}")">@book.Title</a></td>
+                        <td>@book.Author</td>
+                        <td>@book.Publisher</td>
+                        <td>@book.PublicationYear</td>
+                        <td>@(book.AverageRating.HasValue ? $"{book.AverageRating:F1} ({book.ReviewCount})" : "-")</td>
+                        <td>
+                            @if (book.IsAvailable)
+                            {
+                                <span class="badge bg-success">Yes</span>
+                            }
+                            else
+                            {
+                                <span class="badge bg-secondary">On loan</span>
+                            }
+                        </td>
+                        <td>
+                            <a class="btn btn-sm btn-outline-primary me-1" href="@($"books/{book.InventoryNumber}/edit")">Edit</a>
+                            <button class="btn btn-sm btn-outline-danger" @onclick="() => Delete(book)">Delete</button>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </div>
+}
+
+@code {
+    private bool _loading = true;
+    private string? _error;
+    private List<BookDTO> _books = new();
+
+    protected override async Task OnInitializedAsync()
+    {
+        if (!await Auth.IsLoggedInAsync())
+        {
+            Nav.NavigateTo("login", replace: true);
+            return;
+        }
+        await LoadAsync();
+    }
+
+    private async Task LoadAsync()
+    {
+        _loading = true;
+        _error = null;
+        try
+        {
+            var books = await BookApi.GetAllAsync();
+            _books = books.ToList();
+        }
+        catch (HttpRequestException ex)
+        {
+            if (ex.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+            {
+                await Auth.LogoutAsync();
+                Nav.NavigateTo("login", replace: true);
+                return;
+            }
+            _error = ex.Message;
+        }
+        finally
+        {
+            _loading = false;
+        }
+    }
+
+    private async Task Delete(BookDTO book)
+    {
+        var response = await BookApi.DeleteAsync(book.InventoryNumber);
+        if (response.IsSuccessStatusCode)
+        {
+            await LoadAsync();
+        }
+        else if (response.StatusCode == System.Net.HttpStatusCode.Unauthorized)
+        {
+            await Auth.LogoutAsync();
+            Nav.NavigateTo("login", replace: true);
+        }
+        else
+        {
+            _error = $"Failed to delete book: {response.StatusCode}";
+        }
+    }
+}
