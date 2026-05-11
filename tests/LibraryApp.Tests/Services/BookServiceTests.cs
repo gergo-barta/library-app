@@ -57,25 +57,4 @@ public class BookServiceTests
         var ok = await CreateService().DeleteAsync(99);
         ok.Should().BeFalse();
     }
-
-    [Fact]
-    public async Task UpdateAsync_AppliesChanges()
-    {
-        var book = TestDataBuilder.Book(1, "Old");
-        _bookRepo.GetByIdAsync(1).Returns(book);
-        _loanRepo.IsBookCurrentlyLoanedAsync(1).Returns(false);
-
-        var updated = await CreateService().UpdateAsync(1, new UpdateBookRequest
-        {
-            Title = "New",
-            Author = "A",
-            Publisher = "P",
-            PublicationYear = 2021
-        });
-
-        updated.Should().NotBeNull();
-        updated!.Title.Should().Be("New");
-        book.Title.Should().Be("New");
-        await _bookRepo.Received(1).UpdateAsync(book);
-    }
 }

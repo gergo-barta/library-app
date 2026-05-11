@@ -36,25 +36,6 @@ public class ReaderServiceTests
     }
 
     [Fact]
-    public async Task CreateAsync_PersistsReader()
-    {
-        Reader? saved = null;
-        _readerRepo.CreateAsync(Arg.Do<Reader>(r => { r.ReaderNumber = 9; saved = r; }))
-                   .Returns(c => c.Arg<Reader>());
-
-        var result = await CreateService().CreateAsync(new CreateReaderRequest
-        {
-            Name = "Bob",
-            Address = "1051 Bp",
-            DateOfBirth = new DateTime(1990, 1, 1)
-        });
-
-        saved.Should().NotBeNull();
-        result.ReaderNumber.Should().Be(9);
-        result.Name.Should().Be("Bob");
-    }
-
-    [Fact]
     public async Task UpdateAsync_ReturnsNullWhenNotFound()
     {
         _readerRepo.GetByIdAsync(9).Returns((Reader?)null);

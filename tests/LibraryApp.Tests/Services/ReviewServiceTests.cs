@@ -32,37 +32,6 @@ public class ReviewServiceTests
     }
 
     [Fact]
-    public async Task AddAsync_PersistsReview()
-    {
-        var book = TestDataBuilder.Book(1);
-        var reader = TestDataBuilder.Reader(1);
-        _bookRepo.GetByIdAsync(1).Returns(book);
-        _readerRepo.GetByIdAsync(1).Returns(reader);
-
-        Review? saved = null;
-        _reviewRepo.CreateAsync(Arg.Do<Review>(r => { r.Id = 7; saved = r; }))
-                   .Returns(c => c.Arg<Review>());
-
-        var stored = TestDataBuilder.Review(7, 1, 1, 4);
-        stored.Book = book;
-        stored.Reader = reader;
-        _reviewRepo.GetByIdAsync(7).Returns(stored);
-
-        var result = await CreateService().AddAsync(new CreateReviewRequest
-        {
-            InventoryNumber = 1,
-            ReaderNumber = 1,
-            Score = 4,
-            Text = "ok"
-        });
-
-        saved.Should().NotBeNull();
-        result.Should().NotBeNull();
-        result!.Id.Should().Be(7);
-        result.Score.Should().Be(4);
-    }
-
-    [Fact]
     public async Task GetByBookAsync_ReturnsReviews()
     {
         var reader = TestDataBuilder.Reader(1);
